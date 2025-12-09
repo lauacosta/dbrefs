@@ -1,17 +1,10 @@
+open Dbdoc
 open Dbdoc.Json
 open Dbdoc.Analyzer
 
-let () =
-  let fk =
-    Graph.empty
-    |> Graph.add "orders" [ "users"; "products" ]
-    |> Graph.add "user_roles" [ "users"; "roles" ]
-    |> Graph.add "payments" [ "orders" ]
-    |> Graph.add "categories" [] |> Graph.add "logs" []
-  in
-
+let main () =
+  let fk = Database.key_column_usage "demo" in
   let rfk = Analyzer.build_rfk fk in
-
   let orphans = Analyzer.orphan_tables fk rfk in
 
   let junctions =
@@ -27,3 +20,5 @@ let () =
   in
 
   Yojson.Safe.pretty_to_channel stdout json
+
+let () = main ()
