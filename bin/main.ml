@@ -1,28 +1,35 @@
 open Dbrefs
-open Dbrefs.Json
 open Dbrefs.Analyzer
 
 let main () =
-  let fk = Database.key_column_usage "demo" in
-  let rfk = Analyzer.build_rfk fk in
-  let orphans = Analyzer.orphan_tables fk rfk in
+  let open Core_types in
+  let schema = Database.build_schema "demo" in
+  let json = `List (List.map Dbrefs.Core_types.table_to_yojson schema.tables) in
 
-  let junctions =
+  Yojson.Safe.pretty_to_channel stdout json;
+
+  let fk =
+    Graph.map
+      (fun t -> List.map (fun fk -> fk.references_table) t.foreign_keys)
+      schema.table_graph
+  in
+
+  let rfk = Analyzer.build_rfk fk in
+  let orphans_tables = Analyzer.orphan_tables fk rfk in
+
+  let junction_tables =
     Graph.fold
       (fun t _ acc -> if Analyzer.is_junction_table fk t then t :: acc else acc)
       fk []
   in
 
-  let heavy = Analyzer.reference_heavy rfk 2 in
+  let reference_heavy = Analyzer.reference_heavy rfk 2 in
 
-  let json =
-    Json_export.export ~fk ~rfk ~orphans ~junctions ~reference_heavy:heavy
+  let res =
+    Export_types.export ~fk ~rfk ~reference_heavy ~junction_tables
+      ~orphans_tables
   in
 
-  Yojson.Safe.pretty_to_channel stdout json;
-
-  let tables = Database.tables_information_schema "demo" in
-  let json = `List (List.map Database.table_info_to_yojson tables) in
-  print_endline (Yojson.Safe.pretty_to_string json)
+  Yojson.Safe.pretty_to_channel stdout (Export_types.export_to_yojson res)
 
 let () = main ()
