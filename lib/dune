@@ -1,4 +1,5 @@
 (library
  (name dbdoc)
  (modules analyzer database json)
- (libraries yojson mariadb))
+ (libraries yojson mariadb)
+ (preprocess (pps ppx_deriving_yojson)))

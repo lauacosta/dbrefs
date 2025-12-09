@@ -19,6 +19,10 @@ let main () =
     Json_export.export ~fk ~rfk ~orphans ~junctions ~reference_heavy:heavy
   in
 
-  Yojson.Safe.pretty_to_channel stdout json
+  Yojson.Safe.pretty_to_channel stdout json;
+
+  let tables = Database.tables_information_schema "demo" in
+  let json = `List (List.map Database.table_info_to_yojson tables) in
+  print_endline (Yojson.Safe.pretty_to_string json)
 
 let () = main ()

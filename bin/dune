@@ -1,4 +1,5 @@
 (executable
  (public_name dbdoc)
  (name main)
- (libraries dbdoc yojson))
+ (libraries dbdoc yojson)
+ (preprocess (pps ppx_deriving_yojson)))
