@@ -1,2 +1,4 @@
 (library
- (name dbdoc))
+ (name dbdoc)
+ (modules analyzer mariadb json)
+ (libraries yojson mariadb))
