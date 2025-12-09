@@ -1,9 +1,10 @@
 open Dbrefs
 open Dbrefs.Analyzer
+module Mariadb = Mariadb_adapter.MariadbDB
 
 let main () =
   let open Core_types in
-  let schema = Database.build_schema "demo" in
+  let schema = Mariadb.build_schema "demo" in
   let json = `List (List.map Dbrefs.Core_types.table_to_yojson schema.tables) in
 
   Yojson.Safe.pretty_to_channel stdout json;

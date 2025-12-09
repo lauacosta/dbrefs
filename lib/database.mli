@@ -1,8 +1,19 @@
-module M = Mariadb.Blocking
-module Graph = Core_types.Graph
+val or_die : string -> ('a, int * string) result -> 'a
 
-val spawn_connection :
-  ?host:string -> ?user:string -> ?pass:string -> unit -> M.t
+module type DBAdapter = sig
+  type t
 
-val key_column_usage : string -> string list Graph.t
-val build_schema : string -> Core_types.schema
+  val spawn_connection :
+    ?host:string -> ?user:string -> ?pass:string -> unit -> t
+
+  val build_schema : string -> Core_types.schema
+end
+
+module Backend : (B : DBAdapter) -> sig
+  type t = B.t
+
+  val spawn_connection :
+    ?host:string -> ?user:string -> ?pass:string -> unit -> B.t
+
+  val build_schema : string -> Core_types.schema
+end
