@@ -1,0 +1,4 @@
+(executable
+ (public_name dbdoc)
+ (name main)
+ (libraries dbdoc yojson))
