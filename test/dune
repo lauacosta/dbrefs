@@ -1,2 +1,2 @@
 (test
- (name test_dbdoc))
+ (name test_refs))
