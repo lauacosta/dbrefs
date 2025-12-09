@@ -1,6 +1,6 @@
 (lang dune 3.20)
 
-(name refs)
+(name dbrefs)
 
 (generate_opam_files true)
 
@@ -16,7 +16,7 @@
 (documentation https://url/to/documentation)
 
 (package
- (name refs)
+ (name dbrefs)
  (synopsis "A short synopsis")
  (description "A longer description")
  (depends ocaml)

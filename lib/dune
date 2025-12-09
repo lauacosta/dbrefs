@@ -1,5 +1,5 @@
 (library
- (name refs)
- (modules analyzer database json)
+ (name dbrefs)
+ (modules analyzer database json core_types)
  (libraries yojson mariadb)
  (preprocess (pps ppx_deriving_yojson)))

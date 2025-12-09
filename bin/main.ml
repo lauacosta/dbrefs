@@ -1,6 +1,6 @@
-open Dbdoc
-open Dbdoc.Json
-open Dbdoc.Analyzer
+open Dbrefs
+open Dbrefs.Json
+open Dbrefs.Analyzer
 
 let main () =
   let fk = Database.key_column_usage "demo" in

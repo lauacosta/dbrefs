@@ -1,2 +1,2 @@
 (test
- (name test_refs))
+ (name test_dbrefs))

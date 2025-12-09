@@ -1,14 +1,14 @@
-module Graph = Analyzer.Graph
+module Graph = Core_types.Graph
 
-type fk_graph = Analyzer.fk_graph
+type fk_graph = Core_types.fk_graph
 
 module Json_export : sig
   val yojson_of_graph :
     fk_graph ->
-    [> `Assoc of (Graph.key * [> `List of [> `String of string ] list ]) list ]
+    [> `Assoc of (string * [> `List of [> `String of string ] list ]) list ]
 
   val yojson_of_in_degree :
-    'a list Graph.t -> [> `Assoc of (Graph.key * [> `Int of int ]) list ]
+    'a list Graph.t -> [> `Assoc of (string * [> `Int of int ]) list ]
 
   val export :
     fk:fk_graph ->
@@ -19,8 +19,7 @@ module Json_export : sig
     [> `Assoc of
        (string
        * [> `Assoc of
-            (Graph.key
-            * [> `Int of int | `List of [> `String of string ] list ])
+            (string * [> `Int of int | `List of [> `String of string ] list ])
             list
          | `List of [> `String of string ] list ])
        list ]

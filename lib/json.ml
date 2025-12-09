@@ -1,6 +1,6 @@
-module Graph = Analyzer.Graph
+module Graph = Core_types.Graph
 
-type fk_graph = Analyzer.fk_graph
+type fk_graph = Core_types.fk_graph
 
 module Json_export = struct
   let yojson_of_graph (g : fk_graph) =

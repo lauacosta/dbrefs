@@ -1,14 +1,12 @@
-module Graph = Map.Make (String)
-
-type fk_graph = string list Graph.t
+module Graph = Core_types.Graph
 
 module Analyzer = struct
-  type t = fk_graph
+  type t = Core_types.fk_graph
 
-  (* let in_degree g table_name = *)
-  (*   match Graph.find_opt table_name g with *)
-  (*   | None -> 0 *)
-  (*   | Some src -> List.length src *)
+  let in_degree g table_name =
+    match Graph.find_opt table_name g with
+    | None -> 0
+    | Some src -> List.length src
 
   let build_rfk (g : t) : t =
     Graph.fold
