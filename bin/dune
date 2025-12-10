@@ -1,5 +1,5 @@
 (executable
  (public_name dbrefs)
  (name main)
- (libraries dbrefs yojson)
+ (libraries dbrefs yojson cmdliner)
  (preprocess (pps ppx_deriving_yojson)))

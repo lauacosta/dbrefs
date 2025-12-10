@@ -6,15 +6,11 @@ let or_die where = function
 module type DBAdapter = sig
   type t
 
-  val spawn_connection :
-    ?host:string -> ?user:string -> ?pass:string -> unit -> t
-
-  val build_schema : string -> Core_types.schema
+  val build_schema : Dsn.DSN.t -> Core_types.schema
 end
 
 module Backend (B : DBAdapter) = struct
   type t = B.t
 
-  let spawn_connection = B.spawn_connection
   let build_schema = B.build_schema
 end

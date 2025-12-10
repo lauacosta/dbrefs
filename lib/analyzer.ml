@@ -1,7 +1,7 @@
-module Graph = Core_types.Graph
+open Core_types
 
 module Analyzer = struct
-  type t = Core_types.fk_graph
+  type t = fk_graph
 
   let in_degree g table_name =
     match Graph.find_opt table_name g with
