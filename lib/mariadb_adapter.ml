@@ -1,47 +1,38 @@
-module M = Mariadb.Blocking
 module Graph = Core_types.Graph
 module StringSet = Set.Make (String)
 
-module MariadbBackend : Database.DBAdapter = struct
-  type t = M.t
+(** Interface to use to avoid double closing statements or connections by
+    accident *)
+module M = struct
+  module Inner = Mariadb.Blocking
+  module Stmt = Mariadb.Blocking.Stmt
 
-  let spawn_connection ?(host = "127.0.0.1") ?(user = "root") ?(pass = "secret")
-      () =
-    M.connect ~host ~user ~pass () |> Database.or_die "connect"
+  type stmt = Inner.Stmt.t
+  type conn = Inner.t
 
-  let find_opt tbl key = try Hashtbl.find tbl key with Not_found -> None
+  let with_conn conn_raw f =
+    Fun.protect
+      ~finally:(fun () -> ignore (Inner.close conn_raw))
+      (fun () -> f conn_raw)
 
-  let get_string row field_name default =
-    match M.Row.StringMap.find_opt field_name row with
-    | Some v -> ( match M.Field.value v with `String s -> s | _ -> default)
-    | None -> default
-
-  let get_bool row field_name default =
-    match M.Row.StringMap.find_opt field_name row with
-    | Some v -> (
-        match M.Field.value v with
-        | `Int i -> i <> 0
-        | `String "YES" -> true
-        | `String "NO" -> false
-        | _ -> default)
-    | None -> default
-
-  let get_string_opt row field_name =
-    match M.Row.StringMap.find_opt field_name row with
-    | Some v -> (
-        match M.Field.value v with
-        | `String s -> Some s
-        | `Null -> None
-        | _ -> None)
-    | None -> None
+  let with_stmt conn query f =
+    let stmt =
+      match Inner.prepare conn query with
+      | Ok s -> s
+      | Error (code, err) ->
+          failwith (Printf.sprintf "stmt prepare failed #%d: %s" code err)
+    in
+    Fun.protect
+      ~finally:(fun () -> ignore (Inner.Stmt.close stmt))
+      (fun () -> f stmt)
 
   (* Don't evaluate eagerly because the internal buffer in the MariaDB client is re used when consuming the rows so it ends up with the same value*)
   let stream res =
     let module F = struct
-      exception E of M.error
+      exception E of Inner.error
     end in
     let rec next () =
-      match M.Res.fetch (module M.Row.Map) res with
+      match Inner.Res.fetch (module Inner.Row.Map) res with
       | Ok (Some x) -> Seq.Cons (x, next)
       | Ok None -> Seq.Nil
       | Error (code, err) ->
@@ -49,21 +40,60 @@ module MariadbBackend : Database.DBAdapter = struct
           raise (F.E (code, err))
     in
     next
+end
+
+module MariadbBackend : Database.DBAdapter = struct
+  type t = M.conn
+
+  let spawn_connection ?(host = "127.0.0.1") ?(user = "root") ?(pass = "secret")
+      () : t =
+    let (raw : M.Inner.t) =
+      M.Inner.connect ~host ~user ~pass () |> Database.or_die "connect"
+    in
+    raw
+
+  let find_opt tbl key = try Hashtbl.find tbl key with Not_found -> None
+
+  let get_string row field_name default =
+    match M.Inner.Row.StringMap.find_opt field_name row with
+    | Some v -> (
+        match M.Inner.Field.value v with `String s -> s | _ -> default)
+    | None -> default
+
+  let get_bool row field_name default =
+    match M.Inner.Row.StringMap.find_opt field_name row with
+    | Some v -> (
+        match M.Inner.Field.value v with
+        | `Int i -> i <> 0
+        | `String "YES" -> true
+        | `String "NO" -> false
+        | _ -> default)
+    | None -> default
+
+  let get_string_opt row field_name =
+    match M.Inner.Row.StringMap.find_opt field_name row with
+    | Some v -> (
+        match M.Inner.Field.value v with
+        | `String s -> Some s
+        | `Null -> None
+        | _ -> None)
+    | None -> None
 
   let query_map conn db_name ~query ~row_to_kv ~merge =
-    let stmt = M.prepare conn query |> Database.or_die "prepare query" in
+    M.with_stmt conn query @@ fun stmt ->
     let res =
       M.Stmt.execute stmt [| `String db_name |] |> Database.or_die "exec query"
     in
     let map = Hashtbl.create 16 in
+
     Seq.iter
       (fun row ->
         let key, value = row_to_kv row in
         let existing = try Hashtbl.find map key with Not_found -> None in
         let merged = merge existing value in
         Hashtbl.replace map key merged)
-      (stream res);
-    M.Stmt.close stmt |> Database.or_die "stmt close";
+      (M.stream res);
+
     map
 
   let create_column_map conn db_name =
@@ -104,13 +134,11 @@ module MariadbBackend : Database.DBAdapter = struct
       "SELECT TABLE_NAME, TABLE_TYPE FROM information_schema.TABLES WHERE \
        TABLE_SCHEMA = ? ORDER BY TABLE_NAME"
     in
-    let stmt =
-      M.prepare conn tables_query |> Database.or_die "prepare tables"
-    in
+
+    M.with_stmt conn tables_query @@ fun stmt ->
     let res =
       M.Stmt.execute stmt [| `String db_name |] |> Database.or_die "exec tables"
     in
-
     let table_rows =
       let rows = ref [] in
       Seq.iter
@@ -127,11 +155,10 @@ module MariadbBackend : Database.DBAdapter = struct
             (tbl_name, tbl_type)
           in
           rows := tbl_row :: !rows)
-        (stream res);
+        (M.stream res);
       List.rev !rows
     in
 
-    M.Stmt.close stmt |> Database.or_die "stmt close";
     table_rows
 
   let create_fk_map conn db_name =
@@ -173,7 +200,8 @@ module MariadbBackend : Database.DBAdapter = struct
        INDEX_TYPE FROM information_schema.STATISTICS WHERE TABLE_SCHEMA = ? \
        ORDER BY TABLE_NAME, INDEX_NAME, SEQ_IN_INDEX"
     in
-    let stmt = M.prepare conn index_query |> Database.or_die "prepare index" in
+
+    M.with_stmt conn index_query @@ fun stmt ->
     let res =
       M.Stmt.execute stmt [| `String db_name |] |> Database.or_die "exec index"
     in
@@ -200,22 +228,20 @@ module MariadbBackend : Database.DBAdapter = struct
         in
         Hashtbl.replace table_indexes index_name
           (is_unique, idx_type, cols @ [ col_name ]))
-      (stream res);
-    M.Stmt.close stmt |> Database.or_die "stmt close";
+      (M.stream res);
+
     index_map
 
   (* Asks the database for information about the tables from information_schema and returns a schema type*)
   let build_schema db_name =
     let open Core_types in
-    let conn = spawn_connection () in
-
+    M.with_conn (spawn_connection ()) @@ fun conn ->
     let table_rows = create_table_rows conn db_name in
     let column_map = create_column_map conn db_name in
     let fk_map = create_fk_map conn db_name in
     let index_map = create_index_map conn db_name in
 
-    M.close conn;
-    M.library_end ();
+    M.Inner.library_end ();
 
     let tables =
       List.map
