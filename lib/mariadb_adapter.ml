@@ -99,9 +99,7 @@ module MariadbBackend : Database.DBAdapter = struct
 
   let query_map conn db_name ~query ~row_to_kv ~merge =
     M.with_stmt conn query @@ fun stmt ->
-    let res =
-      M.execute stmt [| `String db_name |] |> Database.or_die "exec query"
-    in
+    let* res = M.execute stmt [| `String db_name |] in
     let map = Hashtbl.create 16 in
 
     Seq.iter
@@ -112,7 +110,7 @@ module MariadbBackend : Database.DBAdapter = struct
         Hashtbl.replace map key merged)
       (M.stream res);
 
-    map
+    Ok map
 
   let create_column_map conn db_name =
     let open Core_types in
@@ -154,9 +152,7 @@ module MariadbBackend : Database.DBAdapter = struct
     in
 
     M.with_stmt conn tables_query @@ fun stmt ->
-    let res =
-      M.execute stmt [| `String db_name |] |> Database.or_die "exec tables"
-    in
+    let* res = M.execute stmt [| `String db_name |] in
     let table_rows =
       let rows = ref [] in
       Seq.iter
@@ -177,7 +173,7 @@ module MariadbBackend : Database.DBAdapter = struct
       List.rev !rows
     in
 
-    table_rows
+    Ok table_rows
 
   let create_fk_map conn db_name =
     let open Core_types in
@@ -220,9 +216,7 @@ module MariadbBackend : Database.DBAdapter = struct
     in
 
     M.with_stmt conn index_query @@ fun stmt ->
-    let res =
-      M.execute stmt [| `String db_name |] |> Database.or_die "exec index"
-    in
+    let* res = M.execute stmt [| `String db_name |] in
 
     let index_map = Hashtbl.create 16 in
     Seq.iter
@@ -248,17 +242,17 @@ module MariadbBackend : Database.DBAdapter = struct
           (is_unique, idx_type, cols @ [ col_name ]))
       (M.stream res);
 
-    index_map
+    Ok index_map
 
   (* Asks the database for information about the tables from information_schema and returns a schema type*)
   let build_schema dsn =
     let open Core_types in
     let* conn, db_name = spawn_connection dsn in
     M.with_conn conn @@ fun conn ->
-    let table_rows = create_table_rows conn db_name in
-    let column_map = create_column_map conn db_name in
-    let fk_map = create_fk_map conn db_name in
-    let index_map = create_index_map conn db_name in
+    let* table_rows = create_table_rows conn db_name in
+    let* column_map = create_column_map conn db_name in
+    let* fk_map = create_fk_map conn db_name in
+    let* index_map = create_index_map conn db_name in
 
     M.Inner.library_end ();
 
