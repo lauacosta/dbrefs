@@ -1,6 +1,8 @@
+open Result.Syntax
 module Graph = Core_types.Graph
+module Dsn = Database.Dsn
+module E = Errors
 module StringSet = Set.Make (String)
-module Dsn = Dsn.DSN
 
 (** Interface to use to avoid double closing statements or connections by
     accident *)
@@ -10,6 +12,19 @@ module M = struct
 
   type stmt = Inner.Stmt.t
   type conn = Inner.t
+
+  let execute stmt params =
+    match Stmt.execute stmt params with
+    | Ok res -> Ok res
+    | Error (_code, msg) -> Error (E.Execution_error msg)
+
+  let connect (s : Dsn.server) =
+    match
+      Inner.connect ~host:s.host ~user:s.user ~pass:s.pass ~db:s.database
+        ~port:s.port ()
+    with
+    | Ok raw -> Ok raw
+    | Error (_code, msg) -> Error (E.Invalid_DSN msg)
 
   let with_conn conn_raw f =
     Fun.protect
@@ -45,16 +60,14 @@ end
 
 module MariadbBackend : Database.DBAdapter = struct
   type t = M.conn
+  type error = E.t
 
-  let spawn_connection (dsn : Dsn.t) : t * string =
+  let spawn_connection dsn =
     match dsn with
-    | Dsn.Server s ->
-        print_endline "PROBANDO";
-        let (raw : M.Inner.t) =
-          M.Inner.connect ~host:s.host ~user:s.user ~pass:s.pass ()
-          |> Database.or_die "connect"
-        in
-        (raw, s.database)
+    | Dsn.Server s -> (
+        match M.connect s with
+        | Ok (raw : M.Inner.t) -> Ok (raw, s.database)
+        | Error e -> Error e)
     | Dsn.File _ -> failwith "Unimplemented"
 
   let find_opt tbl key = try Hashtbl.find tbl key with Not_found -> None
@@ -87,7 +100,7 @@ module MariadbBackend : Database.DBAdapter = struct
   let query_map conn db_name ~query ~row_to_kv ~merge =
     M.with_stmt conn query @@ fun stmt ->
     let res =
-      M.Stmt.execute stmt [| `String db_name |] |> Database.or_die "exec query"
+      M.execute stmt [| `String db_name |] |> Database.or_die "exec query"
     in
     let map = Hashtbl.create 16 in
 
@@ -142,7 +155,7 @@ module MariadbBackend : Database.DBAdapter = struct
 
     M.with_stmt conn tables_query @@ fun stmt ->
     let res =
-      M.Stmt.execute stmt [| `String db_name |] |> Database.or_die "exec tables"
+      M.execute stmt [| `String db_name |] |> Database.or_die "exec tables"
     in
     let table_rows =
       let rows = ref [] in
@@ -208,7 +221,7 @@ module MariadbBackend : Database.DBAdapter = struct
 
     M.with_stmt conn index_query @@ fun stmt ->
     let res =
-      M.Stmt.execute stmt [| `String db_name |] |> Database.or_die "exec index"
+      M.execute stmt [| `String db_name |] |> Database.or_die "exec index"
     in
 
     let index_map = Hashtbl.create 16 in
@@ -240,7 +253,7 @@ module MariadbBackend : Database.DBAdapter = struct
   (* Asks the database for information about the tables from information_schema and returns a schema type*)
   let build_schema dsn =
     let open Core_types in
-    let conn, db_name = spawn_connection dsn in
+    let* conn, db_name = spawn_connection dsn in
     M.with_conn conn @@ fun conn ->
     let table_rows = create_table_rows conn db_name in
     let column_map = create_column_map conn db_name in
@@ -300,7 +313,7 @@ module MariadbBackend : Database.DBAdapter = struct
         Graph.empty tables
     in
 
-    { tables; table_graph }
+    Ok { tables; table_graph }
 end
 
 module MariadbDB = Database.Backend (MariadbBackend)

@@ -1,25 +1,4 @@
-(* module StringSet : Set.S with type elt = string *)
-(* module Graph = Core_types.Graph *)
-
-(* module M : sig *)
-(*   module Inner = Mariadb.Blocking *)
-(*   module Stmt = Mariadb.Blocking.Stmt *)
-
-(*   type stmt = Stmt.t *)
-(*   type conn = Inner.t *)
-
-(*   val with_conn : Inner.t -> (Inner.t -> 'a) -> 'a *)
-(*   val with_stmt : Inner.t -> string -> (Inner.Stmt.t -> 'a) -> 'a *)
-(*   val stream : Inner.Res.t -> Inner.Row.Map.t Seq.t *)
-(* end *)
-
-(* module MariadbBackend : Database.DBAdapter *)
-
-(* module MariadbDB : sig *)
-(*   type t = MariadbBackend.t *)
-
-(*   val build_schema : conn:MariadbBackend.t -> string -> Core_types.schema *)
-(* end *)
+module Dsn = Database.Dsn
 
 module M : sig
   module Inner = Mariadb.Blocking
@@ -29,7 +8,7 @@ module M : sig
   type conn = Inner.t
 
   val with_conn : Inner.t -> (Inner.t -> 'a) -> 'a
-  val with_stmt : Inner.t -> string -> (Inner.Stmt.t -> 'a) -> 'a
+  val with_stmt : Inner.t -> string -> (Stmt.t -> 'a) -> 'a
   val stream : Inner.Res.t -> Inner.Row.Map.t Seq.t
 end
 
@@ -37,6 +16,7 @@ module MariadbBackend : Database.DBAdapter
 
 module MariadbDB : sig
   type t = MariadbBackend.t
+  type error = Errors.t
 
-  val build_schema : Dsn.DSN.t -> Core_types.schema
+  val build_schema : Dsn.t -> (Core_types.schema, error) result
 end
