@@ -18,5 +18,5 @@ module MariadbDB : sig
   type t = MariadbBackend.t
   type error = Errors.t
 
-  val build_schema : Dsn.t -> (Core_types.schema, error) result
+  val build_schema : Dsn.t -> (Core_types.SchemaData.t, error) result
 end

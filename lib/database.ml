@@ -153,7 +153,7 @@ module type DBAdapter = sig
   type t
   type error = E.t
 
-  val build_schema : Dsn.t -> (Core_types.schema, error) result
+  val build_schema : Dsn.t -> (Core_types.SchemaData.t, error) result
 end
 
 module Backend (B : DBAdapter) = struct

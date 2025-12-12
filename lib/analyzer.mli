@@ -1,9 +1,5 @@
 module Analyzer : sig
-  type t = Core_types.fk_graph
+  type t = Core_types.FkGraph.t
 
-  val in_degree : 'a list Core_types.Graph.t -> string -> int
-  val build_rfk : t -> t
-  val orphan_tables : t -> t -> string list
-  val is_junction_table : 'a list Core_types.Graph.t -> string -> bool
-  val reference_heavy : 'a list Core_types.Graph.t -> int -> string list
+  val derive_data : Core_types.SchemaData.t -> Core_types.DerivedData.t
 end

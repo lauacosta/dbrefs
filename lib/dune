@@ -1,6 +1,6 @@
 (library
  (name dbrefs)
  (inline_tests)
- (modules analyzer database core_types export_types mariadb_adapter errors)
+ (modules analyzer database core_types mariadb_adapter errors)
  (libraries yojson mariadb)
  (preprocess (pps ppx_deriving.show ppx_expect ppx_deriving_yojson)))

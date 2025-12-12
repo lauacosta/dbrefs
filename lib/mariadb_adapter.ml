@@ -123,12 +123,13 @@ module MariadbBackend : Database.DBAdapter = struct
       let table_name = get_string row "TABLE_NAME" "" in
       let col_name = get_string row "COLUMN_NAME" "" in
       let col =
-        {
-          name = col_name;
-          data_type = get_string row "DATA_TYPE" "";
-          is_nullable = get_bool row "IS_NULLABLE" false;
-          default = get_string_opt row "COLUMN_DEFAULT";
-        }
+        ({
+           name = col_name;
+           data_type = get_string row "DATA_TYPE" "";
+           is_nullable = get_bool row "IS_NULLABLE" false;
+           default = get_string_opt row "COLUMN_DEFAULT";
+         }
+          : Column.t)
       in
       (table_name, (col_name, col))
     in
@@ -187,11 +188,12 @@ module MariadbBackend : Database.DBAdapter = struct
       let table_name = get_string row "TABLE_NAME" "" in
       let col_name = get_string row "COLUMN_NAME" "" in
       let fk =
-        {
-          column = col_name;
-          references_table = get_string row "REFERENCED_TABLE_NAME" "";
-          references_column = get_string row "REFERENCED_COLUMN_NAME" "";
-        }
+        ({
+           column = col_name;
+           references_table = get_string row "REFERENCED_TABLE_NAME" "";
+           references_column = get_string row "REFERENCED_COLUMN_NAME" "";
+         }
+          : ForeignKey.t)
       in
       (table_name, (col_name, fk))
     in
@@ -208,7 +210,6 @@ module MariadbBackend : Database.DBAdapter = struct
     query_map conn db_name ~query ~row_to_kv ~merge
 
   let create_index_map conn db_name =
-    let open Core_types in
     let index_query =
       "SELECT TABLE_NAME, INDEX_NAME, NON_UNIQUE, COLUMN_NAME, SEQ_IN_INDEX, \
        INDEX_TYPE FROM information_schema.STATISTICS WHERE TABLE_SCHEMA = ? \
@@ -225,7 +226,10 @@ module MariadbBackend : Database.DBAdapter = struct
         let index_name = get_string row "INDEX_NAME" "" in
         let col_name = get_string row "COLUMN_NAME" "" in
         let is_unique = not (get_bool row "NON_UNIQUE" true) in
-        let idx_type = parse_index_type (get_string row "INDEX_TYPE" "BTREE") in
+        let idx_type =
+          Core_types.Index.parse_index_type
+            (get_string row "INDEX_TYPE" "BTREE")
+        in
 
         let table_indexes =
           try Hashtbl.find index_map table_name
@@ -288,26 +292,31 @@ module MariadbBackend : Database.DBAdapter = struct
               (fun idx_name (is_unique, idx_type, cols) acc ->
                 if idx_name = "PRIMARY" then acc
                 else
-                  {
-                    name = idx_name;
-                    unique = is_unique;
-                    index_type = idx_type;
-                    columns = cols;
-                  }
+                  ({
+                     name = idx_name;
+                     unique = is_unique;
+                     index_type = idx_type;
+                     columns = cols;
+                   }
+                    : Index.t)
                   :: acc)
               table_indexes []
           in
-          { name; primary_key; foreign_keys; columns; table_type; indexes })
+          ({ name; primary_key; foreign_keys; columns; table_type; indexes }
+            : Table.t))
         table_rows
     in
 
     let table_graph =
-      List.fold_left
-        (fun map tbl -> Graph.add tbl.name tbl map)
-        Graph.empty tables
+      let graph =
+        List.fold_left
+          (fun map tbl -> Graph.add (tbl : Table.t).name tbl map)
+          Graph.empty tables
+      in
+      ({ graph } : TableGraph.t)
     in
 
-    Ok { tables; table_graph }
+    Ok ({ tables; table_graph } : SchemaData.t)
 end
 
 module MariadbDB = Database.Backend (MariadbBackend)

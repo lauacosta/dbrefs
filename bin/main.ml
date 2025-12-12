@@ -1,44 +1,20 @@
 open Result.Syntax
 open Dbrefs
-open Dbrefs.Analyzer
 open Cmdliner
 open Cmdliner.Term.Syntax
+open Dbrefs.Analyzer
 module Mariadb = Mariadb_adapter.MariadbDB
 module Dsn = Database.Dsn
 
 let document_db (dsn : Dsn.t) =
   let open Core_types in
-  let* schema = Mariadb.build_schema dsn in
-  let json = `List (List.map Dbrefs.Core_types.table_to_yojson schema.tables) in
+  let* schema_data = Mariadb.build_schema dsn in
+  let derived_data = Analyzer.derive_data schema_data in
 
-  Yojson.Safe.pretty_to_channel stdout json;
+  Yojson.Safe.pretty_to_channel stdout
+    (Payload.to_yojson { schema_data; derived_data });
 
-  let fk =
-    Graph.map
-      (fun t -> List.map (fun fk -> fk.references_table) t.foreign_keys)
-      schema.table_graph
-  in
-
-  let rfk = Analyzer.build_rfk fk in
-  let orphans_tables = Analyzer.orphan_tables fk rfk in
-
-  let junction_tables =
-    Graph.fold
-      (fun t _ acc -> if Analyzer.is_junction_table fk t then t :: acc else acc)
-      fk []
-  in
-
-  let reference_heavy = Analyzer.reference_heavy rfk 2 in
-
-  let res =
-    Export_types.export ~fk ~rfk ~reference_heavy ~junction_tables
-      ~orphans_tables
-  in
-
-  Yojson.Safe.pretty_to_channel stdout (Export_types.export_to_yojson res);
   Ok ()
-
-(* Yojson.Safe.pretty_to_channel stdout (Dsn.to_yojson dsn) *)
 
 let dsn =
   let doc = "Connection string to the database" in
