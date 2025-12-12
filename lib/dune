@@ -1,6 +1,8 @@
+(include_subdirs unqualified)
+
 (library
  (name dbrefs)
  (inline_tests)
- (modules analyzer database core_types export_types mariadb_adapter errors)
- (libraries yojson mariadb)
+ (modules cli analyzer database core_types dbref_mariadb errors html_generator)
+ (libraries yojson cmdliner mariadb)
  (preprocess (pps ppx_deriving.show ppx_expect ppx_deriving_yojson)))

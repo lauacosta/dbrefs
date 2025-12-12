@@ -148,17 +148,9 @@ module Dsn = struct
             Ok (finalize (File_partial { path = path_opt })))
 end
 
-(** Type signature needed to implement an adapter for a database *)
-module type DBAdapter = sig
+module type Database = sig
   type t
   type error = E.t
 
-  val build_schema : Dsn.t -> (Core_types.schema, error) result
-end
-
-module Backend (B : DBAdapter) = struct
-  type t = B.t
-  type error = E.t
-
-  let build_schema = B.build_schema
+  val build_schema : Dsn.t -> (Core_types.SchemaData.t, error) result
 end
