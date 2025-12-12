@@ -56,13 +56,13 @@ let document_db_cmd =
   @@ let+ dsn = dsn in
      match Dsn.parse_dsn dsn with
      | Error e ->
-         prerr_endline ("DSN parse error: " ^ Errors.show e);
+         prerr_endline (Errors.pp_error e);
          exit 1
      | Ok dsn -> (
          match document_db dsn with
          | Ok () -> ()
          | Error err ->
-             prerr_endline ("Dbrefs error: " ^ Errors.show err);
+             prerr_endline (Errors.pp_error err);
              exit 1)
 
 let main () = Cmd.eval document_db_cmd

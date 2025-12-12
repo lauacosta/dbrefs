@@ -16,15 +16,23 @@ module M = struct
   let execute stmt params =
     match Stmt.execute stmt params with
     | Ok res -> Ok res
-    | Error (_code, msg) -> Error (E.Execution_error msg)
+    | Error (code, msg) ->
+        Error
+          (E.Execution_error
+             ("Failed while executing a statement " ^ Int.to_string code ^ msg))
 
   let connect (s : Dsn.server) =
     match
       Inner.connect ~host:s.host ~user:s.user ~pass:s.pass ~db:s.database
         ~port:s.port ()
     with
-    | Ok raw -> Ok raw
-    | Error (_code, msg) -> Error (E.Invalid_DSN msg)
+    | Ok raw ->
+        Ok raw
+        (* I find the error that the mariadb lib returns is unhelpful as it returns always 2008: out of memory *)
+    | Error (code, _) ->
+        Error
+          (E.Invalid_DSN
+             ("Failed to connect to the database " ^ Int.to_string code))
 
   let with_conn conn_raw f =
     Fun.protect

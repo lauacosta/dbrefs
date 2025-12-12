@@ -4,3 +4,5 @@ type t =
   | Execution_error of string
   | Dsn_scheme_error of string
 [@@deriving show, yojson]
+
+val pp_error : t -> string
